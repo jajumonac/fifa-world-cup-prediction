@@ -22,7 +22,27 @@ Monte Carlo simulation (10,000 runs) of the full tournament bracket using curren
 
 ## Key Results
 
-*(To be updated after model is run)*
+**Model performance** (tested on 2018–present matches):
+- ROC-AUC: **0.853**
+- Brier Score: **0.150** (lower is better; 0.25 = random)
+
+**2026 World Cup Win Probabilities (10,000 simulations):**
+
+| Team | Win Probability |
+|------|----------------|
+| Spain | 27.6% |
+| Argentina | 20.0% |
+| France | 12.0% |
+| England | 6.9% |
+| Brazil | 4.5% |
+| Colombia | 4.0% |
+| Portugal | 3.9% |
+| Ecuador | 3.6% |
+
+**Head-to-head examples:**
+- France beats Brazil 58.6% of the time
+- Argentina beats England 69.2% of the time
+- Mexico beats USA 67.9% of the time
 
 ## Data Source
 
