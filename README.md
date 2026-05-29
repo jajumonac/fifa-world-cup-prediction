@@ -18,9 +18,10 @@ Elo ratings are updated after every international match since 1872. Weights acco
 Logistic regression trained on Elo rating differences to predict win probability for any matchup. Validated on matches from 2018 onward (time-based split, no look-ahead bias).
 
 ### 3. Full Tournament Simulation (10,000 runs)
-- **Group stage:** 12 groups of 4. Win/Draw/Loss probabilities derived from Elo difference. Top 2 per group + 8 best 3rd-place teams advance to Round of 32.
-- **Knockout stage:** R32 → R16 → QF → SF → 3rd Place match + Final.
-- **Output:** Probability of finishing 1st, 2nd, 3rd, and 4th for all 48 teams.
+- **Official groups:** Uses the actual FIFA draw from December 5, 2025 — no randomised group assignment
+- **Group stage:** 12 groups of 4. Win/Draw/Loss probabilities derived from Elo difference. Top 2 per group + 8 best 3rd-place teams advance to Round of 32
+- **Knockout stage:** R32 → R16 → QF → SF → 3rd Place match + Final
+- **Output:** Probability of finishing 1st, 2nd, 3rd, and 4th for all 48 teams
 
 ## Key Results
 
