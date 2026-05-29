@@ -15,10 +15,12 @@ Elo ratings are updated after every international match since 1872. Weights acco
 - Home advantage
 
 ### 2. Match Outcome Model
-Logistic regression trained on Elo rating differences to predict win probability for any matchup. Validated using backtesting on previous World Cups.
+Logistic regression trained on Elo rating differences to predict win probability for any matchup. Validated on matches from 2018 onward (time-based split, no look-ahead bias).
 
-### 3. 2026 Tournament Simulation
-Monte Carlo simulation (10,000 runs) of the full tournament bracket using current Elo ratings. Output: each team's probability of reaching each stage and winning the tournament.
+### 3. Full Tournament Simulation (10,000 runs)
+- **Group stage:** 12 groups of 4. Win/Draw/Loss probabilities derived from Elo difference. Top 2 per group + 8 best 3rd-place teams advance to Round of 32.
+- **Knockout stage:** R32 → R16 → QF → SF → 3rd Place match + Final.
+- **Output:** Probability of finishing 1st, 2nd, 3rd, and 4th for all 48 teams.
 
 ## Key Results
 
@@ -26,20 +28,21 @@ Monte Carlo simulation (10,000 runs) of the full tournament bracket using curren
 - ROC-AUC: **0.853**
 - Brier Score: **0.150** (lower is better; 0.25 = random)
 
-**2026 World Cup Win Probabilities (10,000 simulations):**
+**2026 World Cup Final Standings Probabilities (10,000 simulations):**
 
-| Team | Win Probability |
-|------|----------------|
-| Spain | 27.6% |
-| Argentina | 20.0% |
-| France | 12.0% |
-| England | 6.9% |
-| Brazil | 4.5% |
-| Colombia | 4.0% |
-| Portugal | 3.9% |
-| Ecuador | 3.6% |
+| Team | Champion | Runner-up | 3rd Place | 4th Place |
+|------|----------|-----------|-----------|----------|
+| Spain | 28.0% | 10.7% | 10.8% | 2.8% |
+| Argentina | 19.1% | 11.2% | 9.8% | 3.5% |
+| France | 12.0% | 9.2% | 8.4% | 3.9% |
+| England | 7.0% | 6.8% | 6.9% | 4.5% |
+| Colombia | 4.1% | 5.3% | 5.3% | 4.6% |
+| Brazil | 4.0% | 5.2% | 5.3% | 4.8% |
+| Portugal | 3.9% | 5.2% | 5.1% | 4.5% |
+| Ecuador | 3.3% | 4.6% | 4.7% | 4.6% |
 
 **Head-to-head examples:**
+- Spain beats Argentina 51.9% of the time
 - France beats Brazil 58.6% of the time
 - Argentina beats England 69.2% of the time
 - Mexico beats USA 67.9% of the time
