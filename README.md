@@ -38,21 +38,25 @@ Two features enrich the simulation inputs — no external data required, both de
 
 **2026 World Cup Final Standings Probabilities (10,000 simulations, enriched inputs):**
 
-| Team | Champion | Runner-up | 3rd Place | 4th Place |
-|------|----------|-----------|-----------|----------|
-| Spain | 28.0% | 10.7% | 10.8% | 2.8% |
-| Argentina | 19.1% | 11.2% | 9.8% | 3.5% |
-| France | 12.0% | 9.2% | 8.4% | 3.9% |
-| England | 7.0% | 6.8% | 6.9% | 4.5% |
-| Colombia | 4.1% | 5.3% | 5.3% | 4.6% |
-| Brazil | 4.0% | 5.2% | 5.3% | 4.8% |
-| Portugal | 3.9% | 5.2% | 5.1% | 4.5% |
-| Ecuador | 3.3% | 4.6% | 4.7% | 4.6% |
+| Team | Adj. Elo | Champion | Runner-up | 3rd Place | 4th Place |
+|------|----------|----------|-----------|-----------|----------|
+| Argentina | 2160 | 23.2% | 11.9% | 10.2% | 3.6% |
+| Spain | 2151 | 22.0% | 10.9% | 10.7% | 3.6% |
+| France | 2138 | 18.0% | 11.6% | 10.1% | 3.6% |
+| Germany | 2036 | 5.2% | 6.9% | 6.3% | 5.3% |
+| Turkey | 2025 | 4.2% | 5.2% | 5.7% | 5.1% |
+| Brazil | 2019 | 3.7% | 5.6% | 5.8% | 5.1% |
+| Colombia | 2017 | 3.6% | 5.5% | 5.7% | 5.0% |
+| England | 2019 | 3.6% | 6.3% | 6.0% | 4.8% |
+
+> The enrichment features (recent form + WC psychology proxy) produced notable shifts from base Elo:
+> Argentina and France moved up significantly — both have strong WC track records and positive recent form.
+> Spain's base Elo is highest but their relative WC psychology adjustment was smaller, placing them 2nd.
 
 **Head-to-head examples:**
-- Spain beats Argentina 51.9% of the time
-- France beats Brazil 58.6% of the time
-- Argentina beats England 69.2% of the time
+- Argentina beats Spain 51.3% of the time
+- France beats Brazil 59.2% of the time
+- Argentina beats England 70.1% of the time
 - Mexico beats USA 67.9% of the time
 
 ## Deployment Analysis
