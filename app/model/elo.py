@@ -96,6 +96,76 @@ def compute_form_adj(wc_name: str, df: pd.DataFrame, n: int = 10) -> float:
     return (np.average(pts, weights=weights) - 1.5) * 50  # ±75 Elo max
 
 
+def compute_elo_with_snapshot(
+    df: pd.DataFrame, snapshot_lookback_years: int = 2
+) -> tuple[dict, dict, pd.DataFrame]:
+    """Compute Elo ratings with a mid-point snapshot for velocity calculation.
+
+    The snapshot is taken at (latest match date − snapshot_lookback_years),
+    enabling squad trajectory computation without a second full pass.
+
+    Returns (elo_current, elo_snapshot, match_df).
+    """
+    snapshot_date = df["date"].max() - pd.DateOffset(years=snapshot_lookback_years)
+    elo_ratings: dict[str, float] = {}
+    elo_snapshot: dict[str, float] = {}
+    snapshot_taken = False
+    match_rows = []
+
+    for _, row in df.sort_values("date").iterrows():
+        if not snapshot_taken and row["date"] >= snapshot_date:
+            elo_snapshot = elo_ratings.copy()
+            snapshot_taken = True
+
+        h, a = row["home_team"], row["away_team"]
+        if h not in elo_ratings:
+            elo_ratings[h] = 1500.0
+        if a not in elo_ratings:
+            elo_ratings[a] = 1500.0
+
+        he, ae = elo_ratings[h], elo_ratings[a]
+        ha = 0 if row["neutral"] else 100
+        exp_h = 1 / (1 + 10 ** (-(he + ha - ae) / 400))
+        actual = (1.0 if row["home_score"] > row["away_score"]
+                  else 0.5 if row["home_score"] == row["away_score"]
+                  else 0.0)
+        gd = abs(row["home_score"] - row["away_score"])
+        delta = get_k_factor(row["tournament"]) * goal_diff_multiplier(gd) * (actual - exp_h)
+
+        elo_ratings[h] += delta
+        elo_ratings[a] -= delta
+        match_rows.append({
+            "date": row["date"],
+            "neutral": row["neutral"],
+            "elo_diff": he - ae,
+            "result": actual,
+        })
+
+    if not snapshot_taken:
+        elo_snapshot = elo_ratings.copy()
+
+    return elo_ratings, elo_snapshot, pd.DataFrame(match_rows)
+
+
+def compute_elo_velocity(
+    wc_name: str,
+    elo_current: dict,
+    elo_snapshot: dict,
+    lookback_years: int = 2,
+) -> float:
+    """Annual Elo improvement rate over the past lookback_years → trajectory adjustment.
+
+    Positive = improving team (often young squad coming into form).
+    Negative = declining team (often aging squad past peak).
+    Scaled to ±30 Elo: a ±200 Elo/year annual change hits the cap.
+    """
+    team     = get_dataset_name(wc_name)
+    elo_now  = elo_current.get(team, 1500.0)
+    elo_then = elo_snapshot.get(team, elo_now)
+    annual_rate = (elo_now - elo_then) / lookback_years
+    return float(np.clip(annual_rate * 0.15, -30, 30))
+
+
 def compute_wc_uplift(wc_name: str, df: pd.DataFrame, n_wcs: int = 3) -> float:
     """WC win rate vs overall win rate for the last n_wcs tournaments → Elo adjustment.
 
@@ -137,12 +207,21 @@ def build_team_elos(
     all_teams: list[str],
     elo_ratings: dict,
     df: pd.DataFrame,
+    elo_snapshot: dict | None = None,
 ) -> dict[str, float]:
-    """Return enriched Elo dict for all 48 WC teams."""
-    return {
-        t: get_elo(t, elo_ratings) + compute_form_adj(t, df) + compute_wc_uplift(t, df)
-        for t in all_teams
-    }
+    """Return enriched Elo dict for all 48 WC teams.
+
+    When elo_snapshot is provided the squad trajectory (Elo velocity) feature
+    is added as a fourth enrichment signal.
+    """
+    result = {}
+    for t in all_teams:
+        base = get_elo(t, elo_ratings)
+        form = compute_form_adj(t, df)
+        wc   = compute_wc_uplift(t, df)
+        vel  = compute_elo_velocity(t, elo_ratings, elo_snapshot) if elo_snapshot is not None else 0.0
+        result[t] = base + form + wc + vel
+    return result
 
 
 def update_elo_for_match(

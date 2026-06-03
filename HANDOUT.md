@@ -1,6 +1,6 @@
 # FIFA World Cup 2026 Prediction Model — Project Handout
 
-**Author:** Jadiel Montero — Freelance Data Scientist
+**Author:** Jadiel Montero — Data Scientist  
 **Contact:** [LinkedIn](https://www.linkedin.com/in/jadiel-montero-230814142/) | [Upwork](https://www.upwork.com/freelancers/~01d2e510be92ca3e00?mp_source=share)
 
 ---
@@ -9,25 +9,25 @@
 
 > Which team is most likely to win the 2026 FIFA World Cup, and what is each team's probability of reaching each stage of the tournament?
 
-The goal was not just to pick a winner but to quantify uncertainty: attach a probability to every outcome so the results are actionable for media, betting analysis, or fan engagement.
+The goal was not just to pick a winner but to quantify uncertainty: attach a calibrated probability to every outcome so the results are actionable for media, betting analysis, or fan engagement.
 
 ---
 
 ## 2. Dataset
 
-**Source:** [International football results 1872–present](https://github.com/martj42/international_results), maintained by Mart Jürisoo. Updated after every international match, publicly available.
+**Source:** [International football results 1872–present](https://github.com/martj42/international_results), maintained by Mart Jürisoo. Updated after every international match.
 
 | Property | Value |
 |---|---|
-| Matches | 48,000+ |
+| Matches | 49,000+ |
 | Date range | 1872 – present |
-| Features | Home team, away team, score, tournament, neutral venue flag |
+| Features used | Home team, away team, score, tournament, neutral venue flag |
 | Target | Match outcome (home win / draw / away win) |
 
-**Cleaning steps:**
-- Dropped rows where scores were missing (future scheduled matches)
-- Cast scores to integers
-- Filtered training data to 1970–present (pre-modern era Elo too noisy)
+**Cleaning:**
+- Dropped rows with missing scores (future scheduled matches)
+- Scores cast to integers
+- Training data filtered to 1970–present (pre-modern era Elo too noisy)
 - Time-based train/test split at January 2018 — no look-ahead bias
 
 ---
@@ -36,204 +36,242 @@ The goal was not just to pick a winner but to quantify uncertainty: attach a pro
 
 Elo is a method for calculating relative skill levels between competitors. Originally designed for chess, it has been widely adopted in football analytics.
 
-### How it works
-
-After every match, ratings are updated:
+### Update rule
 
 ```
 new_rating = old_rating + K × weight × (actual − expected)
 ```
 
 Where:
-- **K** is the tournament importance factor
-- **weight** is the goal difference multiplier
-- **actual** is 1 (win), 0.5 (draw), or 0 (loss)
+- **K** = tournament importance factor
+- **weight** = goal difference multiplier
+- **actual** = 1.0 (win), 0.5 (draw), 0.0 (loss)
 - **expected** = 1 / (1 + 10^(−Elo_diff / 400))
 
 ### Design decisions
 
-| Factor | Implementation |
+| Factor | Value |
 |---|---|
 | K-factor (FIFA World Cup) | 60 |
 | K-factor (Continental championships) | 50 |
 | K-factor (Qualifiers) | 40 |
 | K-factor (Friendlies) | 20 |
-| Home advantage | +100 Elo to home team's expected rating |
-| Goal diff multiplier | 1× (1 goal), 1.5× (2 goals), 1.75× (3+), scaling above that |
+| Home advantage | +100 Elo added to home team's effective rating |
+| Goal diff multiplier | 1× (1 goal) · 1.5× (2) · 1.75× (3) · +0.05 per goal above 3 |
 
-Every team starts at 1500 and drifts toward their true level over time. After 150 years of matches, the ratings are highly stable and informative.
-
-**Top teams at tournament start:**
-Argentina (2160), Spain (2151), France (2138), Germany (2036), Turkey (2025)
+Every team starts at 1500 and drifts toward their true level. After 150 years of matches the ratings are highly stable.
 
 ---
 
 ## 4. Match Outcome Model
 
-### Feature engineering
+### Features
 
 The model predicts P(home team wins) given:
 
 | Feature | Description |
 |---|---|
 | `elo_diff` | Home Elo minus away Elo |
-| `home_adv` | 1 if match is not on neutral ground, 0 otherwise |
-| `elo_diff_sq` | Squared Elo difference (captures non-linearity at extremes) |
+| `home_adv` | 1 if match is not on neutral ground |
+| `elo_diff_sq` | Squared Elo difference (non-linearity at extremes) |
 | `elo_diff_abs` | Absolute Elo difference |
 
-Draws were excluded — the model predicts win/loss probability. Draw probability is modeled separately in the group stage simulation using a declining exponential formula.
+Draws excluded — draw probability is modeled separately in the group stage simulation using a declining exponential formula.
 
 ### Model selection
 
-Four algorithms were trained and compared on the same time-based split:
+Four algorithms trained on the same time-based split:
 
 | Model | ROC-AUC | Brier Score |
 |---|---|---|
-| **Logistic Regression** | **0.8534** | **0.1499** |
-| Random Forest | 0.8532 | 0.1506 |
-| XGBoost | 0.8528 | 0.1502 |
-| Gradient Boosting | 0.8527 | 0.1504 |
+| **Logistic Regression** | **0.8545** | **0.1492** |
+| Random Forest | 0.8541 | 0.1498 |
+| XGBoost | 0.8537 | 0.1495 |
+| Gradient Boosting | 0.8535 | 0.1497 |
 
-All four models scored within **0.0007 AUC** of each other. This is not a coincidence — the relationship between Elo difference and win probability is smooth and monotonic. A logistic curve is the correct shape; tree-based models offer no advantage. More complex does not mean better in this setting.
+All within 0.001 AUC. The correct model is a logistic curve — the Elo-difference → win-probability relationship is smooth and monotonic. Tree-based models add no value here.
 
-**Logistic Regression was selected** for three reasons:
-1. Best performance on both metrics
-2. Outputs naturally calibrated probabilities — critical for downstream applications that price outcomes
-3. Interpretable and auditable — one coefficient per feature
+**Logistic Regression selected:** best metrics, well-calibrated probabilities, interpretable coefficients.
 
-### Validation methodology
+### Validation
 
-Training: all matches before January 2018
-Testing: all matches from January 2018 onward
+- Train: all matches before January 2018
+- Test: all matches from January 2018 onward
 
-This mirrors real production conditions: the model is always predicting future events from past data. Cross-validation was avoided here because it would mix future information into training.
+Time-based split mirrors real production conditions. Cross-validation avoided to prevent future-data leakage.
 
 ---
 
 ## 5. Feature Enrichment
 
-The base model captures long-run team strength via Elo. For the 2026 simulation, two short-run signals were added to the simulation inputs — not to the model — using only data already available in the dataset.
+The base model captures long-run team strength via Elo. Three short-run signals are added to the simulation inputs — not retrained into the model — using only existing match history.
 
-### Feature 1: Recent Form
+### Feature 1: Recent Form (±75 Elo)
 
-For each of the 48 tournament teams, weighted points-per-game in their last 10 international matches (2025 onward):
+Weighted points-per-game in each team's last 10 international matches (2025 onward):
 - Win = 3 pts, Draw = 1 pt, Loss = 0 pts
-- Linear recency weighting: most recent match = highest weight
-- Normalized to an Elo adjustment of ±75 points
+- Linear recency weighting (most recent = highest weight)
+- Normalized to Elo adjustment: `(wPPG − 1.5) × 50`
 
-### Feature 2: World Cup Psychology Proxy
+### Feature 2: World Cup Psychology Proxy (±40 Elo)
 
-For each team, compare their World Cup win rate (1990–present) to their overall international win rate in the same period:
-- Positive difference = historically over-performs under World Cup pressure
-- Negative difference = historically under-performs in World Cups relative to Elo
-- Scaled to an Elo adjustment of ±40 points
+For each team: compare WC win rate vs overall win rate across the **last 3 World Cups (2014, 2018, 2022)**.
 
-This is a proxy for the psychological dimension of tournament football — "big-game mentality." It is a correlation, not a proven causal mechanism, and is documented as such.
+Using a recent sliding window — rather than all WC history since 1990 — prevents teams with old titles from dominating modern predictions. Brazil's 1994 and 2002 wins previously inflated their WC psychology score, causing the model to rank them #1 in every historical backtest despite not winning since 2002. The window fix resolved this: Argentina was correctly predicted as the 2022 champion.
 
-### Impact on results
+Formula: `clip((wc_win_rate − overall_win_rate) × 300, −40, +40)`
 
-| Team | Base Elo | Adj. Elo | Change |
-|---|---|---|---|
-| Argentina | ~2080 | 2160 | +80 |
-| France | ~2060 | 2138 | +78 |
-| Spain | ~2200 | 2151 | −49 |
-| Germany | ~1990 | 2036 | +46 |
+### Feature 3: Squad Trajectory / Age Proxy (±30 Elo)
 
-France and Argentina moved up significantly due to strong WC track records. Spain's base Elo was highest, but their relative WC psychology adjustment was smaller.
+The annual rate of Elo improvement over the past 2 years:
+
+```
+velocity = (Elo_now − Elo_2yr_ago) / 2
+adjustment = clip(velocity × 0.15, −30, +30)
+```
+
+- **Positive** = improving team (often young squad coming into form)
+- **Negative** = declining team (often aging squad past peak)
+- A ±200 Elo/year change maps to the ±30 cap
+
+This is a data-driven proxy for squad age dynamics. A squad that has been consistently improving over two years — like Spain after their Euro 2024 win — gets a meaningful boost, even if their base Elo hasn't fully caught up yet.
+
+*Note: true squad-level age data would require a player roster dataset. This feature captures the same underlying dynamic from match results alone.*
+
+### Enrichment impact for 2026
+
+| Feature | Range across 48 teams |
+|---------|----------------------|
+| Recent form | −47.7 to +66.8 |
+| WC psychology | −40.0 to +40.0 |
+| Squad trajectory | −15.8 to +13.8 |
+
+Notable 2026 trajectory movers:
+- **Spain +11.1** — Euro 2024 winners, strong upward trajectory
+- **Norway +13.8** — consistent improvement in qualifiers
+- **Qatar −15.8** — catastrophic 2022 host WC performance
+- **Belgium −7.2** — aging golden generation in decline
 
 ---
 
-## 6. Tournament Simulation
+## 6. Feature Development Iterations
+
+The enrichment layer was developed through four iterations, each validated against a historical backtest across the 2010, 2014, 2018, and 2022 World Cups. All Elo, model training, and enrichment used only pre-tournament data (zero look-ahead bias, 10,000 simulations per tournament).
+
+| Version | Change | Top-1 | Top-3 | Avg rank | Avg champion prob |
+|---------|--------|-------|-------|----------|------------------|
+| **v1** | Baseline: WC psychology uses all history since 1990 | 0/4 | 3/4 | 3.5 | 16.8% |
+| **v2** | WC psychology → last 3 tournaments only | 1/4 | 3/4 | 3.5 | 17.5% |
+| **v3** | Time-decayed Elo (10%/yr reversion) + v2 | 1/4 | 3/4 | 3.8 | 16.9% |
+| **v4** ✓ | v2 + squad trajectory (2-yr Elo velocity) | 1/4 | 3/4 | 3.5 | **18.4%** |
+
+**v1 → v2:** Brazil ranked #1 in all four historical simulations. Root cause: the WC psychology feature used all history since 1990, permanently encoding Brazil's 1994 and 2002 titles. Switching to a 3-tournament window removed the bias. Result: Argentina correctly predicted as 2022 champion (rank #1, 29.9% probability).
+
+**v2 → v3:** Time-decayed Elo applies proportional reversion to all teams. Since all ratings decay together, relative rankings barely change — the Brazil bias lives in the base Elo too, not just the uplift. v3 performed worse than v2. Lesson: equal proportional decay is not the right tool for this problem.
+
+**v3 → v4:** Squad trajectory adds a meaningful forward signal. The 2018 France miss persists (rank #8, 2.9%) — the trajectory feature showed France had near-zero Elo change from 2016 to 2018 (+3 points). Mbappé's emergence and Kanté's form are invisible to match-result metrics. Fixing the 2018 case requires player-level data: a potential v5 extension.
+
+**v4 for 2026:** Spain's Euro 2024 win produces a +11.1 trajectory boost, pushing them neck-and-neck with France. Argentina's 2022 WC probability increases from 29.9% → 32.1%, correctly capturing their unbeaten-run momentum going into Qatar.
+
+---
+
+## 7. Tournament Simulation
 
 ### Group stage
 
-- 12 official groups (from the real FIFA draw, December 5 2025)
-- Each team plays all 3 others in their group (round-robin)
-- For each match, Win/Draw/Loss probabilities are computed from enriched Elo difference:
+- 12 official groups (real FIFA draw, December 5, 2025)
+- Round-robin: each team plays the 3 others in their group
+- W/D/L probabilities from enriched Elo difference:
   - `P(draw) = 0.25 × exp(−|elo_diff| / 500)`
   - `P(win) = logistic(elo_diff) × (1 − P(draw))`
-- Top 2 from each group qualify automatically (24 teams)
-- Best 8 of 12 third-place finishers also qualify (8 teams)
-- Total: 32 teams advance to the knockout stage
+- Top 2 per group qualify (24 teams); best 8 third-place finishers also qualify (8 teams)
 
 ### Knockout stage
 
-Round of 32 → Round of 16 → Quarter-finals → Semi-finals → 3rd Place + Final
-
-For each knockout match, win probability comes from the trained logistic regression model using the four-feature input. No draws — extra time and penalties treated as an Elo-weighted coin flip.
+R32 → R16 → QF → SF → 3rd Place match + Final. Win probability from the trained logistic regression on four-feature input. No draws — extra time and penalties treated as an Elo-weighted coin flip.
 
 ### Simulation
 
-The full tournament is simulated **10,000 times**. Each run is independent with a fresh random seed. The output is the empirical distribution of outcomes: the fraction of runs in which each team finishes 1st, reaches the final, reaches the semi-final, and so on.
-
-10,000 runs gives probabilities stable to within ±0.5% for most teams.
+Full tournament simulated **10,000 times** with independent random seeds. Output is the empirical distribution of outcomes. Probabilities stable to ±0.5% for most teams.
 
 ---
 
-## 7. Key Results
+## 8. Key Results
 
-**Championship probabilities (10,000 simulations, enriched inputs):**
+**Model performance (test set: 2018–present):**
 
-| Team | Adj. Elo | Champion | Runner-up | 3rd Place |
-|---|---|---|---|---|
-| Argentina | 2160 | 23.2% | 11.9% | 10.2% |
-| Spain | 2151 | 22.0% | 10.9% | 10.7% |
-| France | 2138 | 18.0% | 11.6% | 10.1% |
-| Germany | 2036 | 5.2% | 6.9% | 6.3% |
-| Turkey | 2025 | 4.2% | 5.2% | 5.7% |
-| Brazil | 2019 | 3.7% | 5.6% | 5.8% |
-| Colombia | 2017 | 3.6% | 5.5% | 5.7% |
-| England | 2019 | 3.6% | 6.3% | 6.0% |
+| Metric | Score | Benchmark |
+|---|---|---|
+| ROC-AUC | **0.855** | 0.5 = random, 1.0 = perfect |
+| Brier Score | **0.149** | 0.25 = random, 0.0 = perfect |
 
-**Head-to-head examples:**
-- Argentina beats Spain 51.3% of the time
-- France beats Brazil 59.2% of the time
-- Argentina beats England 70.1% of the time
+**2026 Championship Probabilities (10,000 simulations, v4 enrichment):**
+
+| Team | Group | Adj. Elo | Champion | Runner-up | 3rd Place | Reach Final | Reach SF |
+|---|---|---|---|---|---|---|---|
+| France | I | 2222 | **25.7%** | 10.4% | 12.1% | 36.1% | 53.7% |
+| Spain | H | 2227 | **23.8%** | 10.6% | 14.1% | 34.4% | 53.7% |
+| Argentina | J | 2196 | **17.6%** | 15.3% | 9.6% | 32.9% | 48.0% |
+| Colombia | K | 2103 | 5.0% | 7.6% | 6.5% | 12.6% | 24.1% |
+| Germany | E | 2075 | 4.4% | 5.8% | 5.9% | 10.2% | 21.5% |
+| Netherlands | F | 2085 | 4.3% | 5.4% | 5.9% | 9.8% | 20.4% |
+| England | L | 2065 | 3.5% | 6.8% | 5.7% | 10.3% | 22.2% |
+| Brazil | C | 2039 | 2.2% | 4.8% | 3.9% | 7.0% | 15.9% |
+
+**Historical backtest (v4):**
+
+| Year | Actual Champion | Model Rank | Prob. Assigned |
+|---|---|---|---|
+| 2010 South Africa | Spain | #2 | 24.9% |
+| 2014 Brazil | Germany | #3 | 13.6% |
+| 2018 Russia | France | #8 | 2.9% |
+| 2022 Qatar | **Argentina** | **#1 ✓** | **32.1%** |
+
+Top-3 accuracy: **75% (3/4)**. Average champion probability assigned: **18.4%**.
 
 ---
 
-## 8. Deployment Analysis
+## 9. Deployment Analysis
 
-### Is this model production-ready?
-
-**Verdict: Yes, with defined limitations.**
+**Verdict: Production-ready with defined limitations.**
 
 | Criterion | Assessment |
 |---|---|
-| Predictive accuracy | ROC-AUC 0.853 — strong for football, a notoriously noisy sport |
-| Probability calibration | Logistic regression is well-calibrated by design |
+| Predictive accuracy | ROC-AUC 0.855 — strong for football, a noisy low-scoring sport |
+| Probability calibration | Logistic regression well-calibrated by design |
 | Inference speed | Milliseconds — no GPU required |
-| Data dependency | One public CSV, updated automatically |
-| Interpretability | One coefficient per feature — auditable |
-| Staleness risk | Requires re-run after each international window |
+| Data dependency | One public CSV, updated automatically after each match |
+| Interpretability | One coefficient per feature — fully auditable |
+| Staleness risk | Re-run after each international window |
 
-### Limitations
-- Injuries and suspensions not incorporated
-- Elo does not react to coaching changes
-- WC psychology proxy has limited sample for new nations
-- Knockout bracket seeding is randomised in simulation
+**Deployment recommendations:**
+1. **API endpoint** — FastAPI endpoint returning win/draw/loss probabilities with Elo snapshot timestamp
+2. **Automated Elo refresh** — post-match pipeline job after each international window
+3. **Prediction monitoring** — log predicted vs actual; alert if rolling Brier Score exceeds 0.20
+4. **Annual retrain** — refit logistic regression on full updated dataset each year
+5. **Player-level module (v5)** — squad rosters + player ratings would address the 2018-type miss where squad transformation is invisible to team-level Elo
+
+**Known limitations:**
+- Injuries and suspensions not captured
+- Squad transformation (young talent peaking) only visible after results accumulate
+- WC psychology feature has limited statistical power for nations with few WC appearances
+- Knockout bracket third-place seeding approximated (FIFA uses a 495-entry lookup table)
 
 ---
 
-## 9. Web Application
+## 10. Web Application
 
-### Overview
+An interactive Streamlit app with five pages, deployable on Streamlit Community Cloud.
 
-A four-feature interactive web application built in Python (Streamlit), deployable for free on Streamlit Community Cloud.
+### Pages
 
-### Features
-
-**1. Tournament Overview**
-Pre-tournament predictions: championship probabilities, group strength charts, full tournament heatmap (all 48 teams × 6 stages), and road-to-the-final curves for the top 12 contenders.
-
-**2. Live Tournament Tracker**
-As the World Cup unfolds, users enter match results. The app updates each team's Elo rating using the same K-factor formula, re-runs 10,000 simulations with the updated ratings, and shows how each result shifts the championship probabilities — including a before/after comparison.
-
-**3. Match Predictor**
-Any two teams can be selected from a dropdown. The app returns win/draw/loss probabilities for that specific matchup based on current enriched Elo ratings, with a breakdown of what the Elo difference means.
-
-**4. Bracket Builder**
-Users select which 32 teams they believe will advance to the knockout stage, then pick winners round by round. For each user-defined bracket state, the app runs the forward simulation and shows championship probabilities for the remaining teams.
+| Page | Function |
+|---|---|
+| **Overview** | Pre-tournament predictions: championship table, group heatmaps, tournament progression for all 48 teams |
+| **Live Tracker** | Enter real match results; app updates Elo ratings and re-runs 10,000 simulations live |
+| **Match Predictor** | Win/draw/loss probabilities for any head-to-head matchup |
+| **Bracket Builder** | Build a custom Round of 32; simulate or pick winners manually round by round |
+| **Knockout Explorer** | Who each team is most likely to face at each stage, plus full opponent probability heatmap |
 
 ### Architecture
 
@@ -244,23 +282,15 @@ app/
     1_Live_Tracker.py
     2_Match_Predictor.py
     3_Bracket_Builder.py
+    4_Knockout_Explorer.py
   model/
-    data.py                 Data loading, group definitions
-    elo.py                  Elo computation and enrichment
+    data.py                 Data loading, group definitions, WC start dates
+    elo.py                  Elo engine + all enrichment (form, WC proxy, trajectory)
     predict.py              Model training and inference
-    simulate.py             Tournament simulation
+    simulate.py             Monte Carlo tournament simulation
+    core.py                 Streamlit session state initialisation
   requirements.txt
 ```
-
-### Tech stack
-
-| Layer | Technology | Reason |
-|---|---|---|
-| Frontend + Backend | Streamlit | Pure Python, no frontend expertise required, free hosting |
-| ML model | scikit-learn LogisticRegression | Lightweight, calibrated, already trained |
-| Data | pandas + numpy | Standard data manipulation |
-| Visualizations | matplotlib + seaborn | Consistent with the research notebook |
-| Hosting | Streamlit Community Cloud | Free, deploys directly from GitHub |
 
 ### Running locally
 
@@ -270,22 +300,25 @@ pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-### Deployment on Streamlit Cloud
+### Tech stack
 
-1. Push the repository to GitHub
-2. Go to share.streamlit.io and connect the repository
-3. Set the main file path to `app/streamlit_app.py`
-4. Deploy — Streamlit handles the rest
+| Layer | Technology |
+|---|---|
+| Frontend + Backend | Streamlit |
+| ML model | scikit-learn LogisticRegression |
+| Data | pandas, numpy |
+| Visualizations | matplotlib |
+| Hosting | Streamlit Community Cloud (free) |
 
 ---
 
-## 10. Potential Applications
+## 11. Potential Applications
 
 | Domain | Use Case |
 |---|---|
-| Sports media | Automated tournament previews and live probability updates |
-| Sports betting | Identify mispriced lines where model diverges from bookmaker odds by >5% |
+| Sports media | Automated tournament previews and live probability updates after each match |
+| Sports betting | Identify mispriced lines where model probability diverges from bookmaker implied odds by >5% |
 | Fantasy sports | Inform player selection based on team advancement probabilities |
-| National federations | Benchmark competitive position; quantify the Elo gap to the next tier |
-| Brand & sponsorship | Quantify expected tournament reach of a potential sponsor team |
-| Research | Reproducible baseline for testing more complex football prediction models |
+| National federations | Benchmark competitive position; quantify Elo gap to the next tier |
+| Brand & sponsorship | Quantify expected tournament reach of a potential sponsor team before signing |
+| Research | Reproducible Elo + logistic regression baseline for testing more complex models |

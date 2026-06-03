@@ -1,7 +1,7 @@
 """Shared initialization — called by every page to ensure model is in session state."""
 import streamlit as st
 from .data import load_data, get_all_teams, GROUPS
-from .elo import compute_elo_ratings, build_team_elos
+from .elo import compute_elo_with_snapshot, build_team_elos
 from .predict import train_model
 from .simulate import sim_tournament
 
@@ -9,15 +9,15 @@ from .simulate import sim_tournament
 @st.cache_resource(show_spinner="Loading 150 years of match data and training model…")
 def _load_model_and_data():
     df = load_data()
-    elo_ratings, match_df = compute_elo_ratings(df)
+    elo_ratings, elo_snapshot, match_df = compute_elo_with_snapshot(df)
     model, metrics = train_model(match_df)
     all_teams = get_all_teams()
-    team_elos = build_team_elos(all_teams, elo_ratings, df)
+    team_elos = build_team_elos(all_teams, elo_ratings, df, elo_snapshot=elo_snapshot)
     return df, elo_ratings, model, metrics, team_elos
 
 
 @st.cache_data(show_spinner="Running 10,000 baseline simulations…")
-def _baseline_simulation(_model, _team_elos_frozen, _version="v3"):
+def _baseline_simulation(_model, _team_elos_frozen, _version="v4"):
     # _version bump forces cache invalidation when sim_tournament changes
     return sim_tournament(GROUPS, dict(_team_elos_frozen), _model, n_sims=10_000)
 
