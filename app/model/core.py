@@ -17,7 +17,7 @@ def _load_model_and_data():
 
 
 @st.cache_data(show_spinner="Running 10,000 baseline simulations…")
-def _baseline_simulation(_model, _team_elos_frozen, _version="v2"):
+def _baseline_simulation(_model, _team_elos_frozen, _version="v3"):
     # _version bump forces cache invalidation when sim_tournament changes
     return sim_tournament(GROUPS, dict(_team_elos_frozen), _model, n_sims=10_000)
 
