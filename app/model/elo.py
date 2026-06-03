@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from .data import DATASET_NAME, get_dataset_name
+from .data import DATASET_NAME, WC_START_DATES, get_dataset_name
 
 
 def get_k_factor(tournament: str) -> int:
@@ -96,29 +96,37 @@ def compute_form_adj(wc_name: str, df: pd.DataFrame, n: int = 10) -> float:
     return (np.average(pts, weights=weights) - 1.5) * 50  # ±75 Elo max
 
 
-def compute_wc_uplift(wc_name: str, df: pd.DataFrame) -> float:
-    """WC win rate vs overall win rate (1990+) → Elo adjustment."""
+def compute_wc_uplift(wc_name: str, df: pd.DataFrame, n_wcs: int = 3) -> float:
+    """WC win rate vs overall win rate for the last n_wcs tournaments → Elo adjustment.
+
+    Uses a sliding window of the most recent n_wcs World Cups rather than all
+    history since 1990. This prevents teams with old titles (e.g. Brazil 2002)
+    from dominating predictions in later tournaments where their recent WC form
+    is poor.
+    """
     team = get_dataset_name(wc_name)
 
-    wc_hist = df[
+    past_wcs = sorted([d for d in WC_START_DATES if d < df["date"].max()])
+    if not past_wcs:
+        return 0.0
+    window_start = past_wcs[-min(n_wcs, len(past_wcs))]
+
+    wc_hist  = df[
         df["tournament"].str.contains("FIFA World Cup", na=False) &
         ~df["tournament"].str.contains("ualif", case=False, na=False) &
-        (df["date"] >= "1990-01-01")
+        (df["date"] >= window_start)
     ]
-    all_hist = df[df["date"] >= "1990-01-01"]
+    all_hist = df[df["date"] >= window_start]
 
     def win_rate(subset: pd.DataFrame):
         sub = subset[(subset["home_team"] == team) | (subset["away_team"] == team)]
         if len(sub) < 5:
             return None
-        wins = sum(
-            (r.home_team == team and r.home_score > r.away_score) or
-            (r.away_team == team and r.away_score > r.home_score)
-            for _, r in sub.iterrows()
-        )
-        return wins / len(sub)
+        home_wins = ((sub["home_team"] == team) & (sub["home_score"] > sub["away_score"])).sum()
+        away_wins = ((sub["away_team"] == team) & (sub["away_score"] > sub["home_score"])).sum()
+        return (home_wins + away_wins) / len(sub)
 
-    wc_r = win_rate(wc_hist)
+    wc_r  = win_rate(wc_hist)
     all_r = win_rate(all_hist)
     if wc_r is None or all_r is None:
         return 0.0

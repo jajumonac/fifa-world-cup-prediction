@@ -2,6 +2,12 @@ import pandas as pd
 
 DATA_URL = "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"
 
+# Start dates of each FIFA World Cup (used for the recent-WC-window feature)
+WC_START_DATES = pd.to_datetime([
+    "1990-06-08", "1994-06-17", "1998-06-10", "2002-05-31",
+    "2006-06-09", "2010-06-11", "2014-06-12", "2018-06-14", "2022-11-20",
+])
+
 GROUPS = {
     "A": ["Mexico", "South Africa", "South Korea", "Czechia"],
     "B": ["Canada", "Bosnia and Herzegovina", "Qatar", "Switzerland"],
